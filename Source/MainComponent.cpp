@@ -71,33 +71,8 @@ public:
     //==============================================================================
     MainContentComponent()
     {
-        
-        //path = "Resources/test_video.mp4";
-        
-        path = "Resources/test.png";
-        img = cv::imread(path);
-        /*
-        cv::waitKey(100);
-        while(!img.data){
-            cv::waitKey(10);
-            std::cout << "Waiting on image to load..." << std::endl;
-        }
-        
-        startTimer(10);
-        */
-        
-        
-        //juce::VideoComponent camDev(true);
-        //camDev.getAvailableDevices();
-        
-        //camDev.openDevice(0);
-        
-        
-        
         setSize (800, 800);
-        
-        
-    
+     
         freqSlider.setSliderStyle(juce::Slider::SliderStyle::LinearHorizontal);
         freqSlider.setRange(30.0, 2000.0, 1.0);
         freqSlider.setTextValueSuffix("Hz");
@@ -129,16 +104,9 @@ public:
         snapshotButton.onClick = [this] { takeSnapshot(); };
         snapshotButton.setEnabled (false);
         
-        //addAndMakeVisible (recordMovieButton);
-        //recordMovieButton.onClick = [this] { startRecording(); };
-        //recordMovieButton.setEnabled (false);
-        
         addAndMakeVisible (lastSnapshot);
         
         cameraSelectorComboBox.setSelectedId (2);
-        
-        
-        
     }
 
     ~MainContentComponent()
@@ -306,26 +274,19 @@ public:
         if (! image.isValid())
             return;
         
-        //float w = 1074, h = 720;
         
         const int desired_width = image.getWidth();
         const int desired_height = image.getHeight();
+
         
-        //const int desired_width        = 1074;
-        //const int desired_height    = 720;
-        
-        //Let's try converting to grayscale in JUCE first
+        //Converting to grayscale in JUCE first
         juce::Image imageCopy = image.createCopy();
         imageCopy.desaturate();
         
-        // I did it!
-        
-        // Let's loop through all pixels to get a Color object, then get the brightness from it
-        // We can!
-        // It's slow but it works
-        // Now we need to make a blank Mat the same size as our juce image, then copy all pixels over
+        //Loop through all pixels to get a Color object, then get the brightness from it
+        //Copying direct from memory would likely be faster
+        //Copy all pixels from JUCE image to Mat
         cv::Mat cvCopy = cv::Mat::zeros(cv::Size(desired_width,desired_height),CV_8UC1);
-        
         juce::Colour pixCol;
         float pixBright;
         
@@ -334,44 +295,21 @@ public:
                 //pixCol = imageCopy.getPixelAt(col_index, row_index);
                 pixBright = (imageCopy.getPixelAt(col_index, row_index)).getBrightness();
                 cvCopy.at<uchar>(row_index, col_index) = 255*pixBright;
-                /*
-                 if(pixBright > 0.5){
-                 cvCopy.at<uchar>(row_index, col_index) = 255; // white
-                 }
-                 else{
-                 cvCopy.at<uchar>(row_index, col_index) = 0; //black
-                 }
-                 */
-                
             }
-            
         }
         
         lastSnapshot.setImage (image);
         
-        
-        
-        // Resize width to desired wavetable size
-        //desired_width = 1024;
-        
-        
-        //Preprocessing
-        //cv::cvtColor(cvCopy,cvCopy,cv::COLOR_BGR2GRAY); // Convert to grayscale
+        //Preprocessing for box detection
         cv::GaussianBlur(cvCopy, cvCopy, cv::Size(7,7), 5,0);
         cv::Canny(cvCopy,cvCopy,50,150);
-        
-        cv::Mat kernel = getStructuringElement(cv::MORPH_RECT, cv::Size(7,7)); //Only use odd numbers
-        cv::Mat kernel2 = getStructuringElement(cv::MORPH_RECT, cv::Size(3,3)); //Only use odd numbers
+        cv::Mat kernel = getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+        cv::Mat kernel2 = getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
         cv::dilate(cvCopy, cvCopy, kernel);
         cv::erode(cvCopy, cvCopy, kernel2);
         
-        //cv::imwrite("/Users/chasedurand/Desktop/imgProc.jpg", cvCopy);
-        
-        
         //get Contours
-        
-        std::vector<cv::Point> biggest; // was previously return value
-        
+        std::vector<cv::Point> biggest;
         std::vector<std::vector<cv::Point>> contours;
         std::vector<cv::Vec4i> hierarchy;
         
@@ -388,7 +326,7 @@ public:
             
             
             if (area>2000){ //Filter areas smaller than 1000
-                //TODO also filter by "rectangleness" (relative width and height
+                //TODO also filter by "rectangleness" (relative width and height)
                 float peri = cv::arcLength(contours[i],true);
                 cv::approxPolyDP(contours[i], conPoly[i], 0.02 * peri, true);
                 
@@ -403,10 +341,7 @@ public:
             }
         }
         
-        //end of get contours function
-        
-        
-        //reorder
+        //Reorder points
         std::vector<cv::Point> newPoints;
         std::vector<int> sumPoints, subPoints;
         
@@ -430,31 +365,11 @@ public:
             return;
         }
         
-        
-        
-        
-        
-        //draw reordered points
-        /*
-         for( int i = 0; i < newPoints.size(); i++){
-         circle(cvCopy,newPoints[i],5,cv::Scalar(0,255,0), cv::FILLED);
-         //putText(cvCopy, to_string(i), points[i],FONT_HERSHEY_PLAIN, 3, cv::Scalar(0,255,0), 1);
-         }
-         cv::imwrite("/Users/chasedurand/Desktop/imgPoints.jpg", cvCopy);
-         */
-        
-        
         //Fix perspective
         cv::Point2f src[4] = { newPoints[0], newPoints[1], newPoints[2], newPoints[3]};
         cv::Point2f dst[4] = { {0.0f,0.0f}, {(float)desired_width,0.0f}, {0.0f,(float)desired_height}, {(float)desired_width,(float)desired_height} };
         cv::Mat matrix = cv::getPerspectiveTransform(src, dst);
         cv::warpPerspective(cvCopy, cvCopy, matrix, cv::Point(desired_width,desired_height));
-        
-        //cv::imwrite("/Users/chasedurand/Desktop/1imgWarped.jpg", cvCopy);
-        
-        
-        
-        
         
         //Crop and flip
         int cropAmount = 60;
@@ -462,24 +377,17 @@ public:
         cvCopy = cvCopy(roi);
         flip(cvCopy,cvCopy,1);
         
-        //cv::imwrite("/Users/chasedurand/Desktop/2imgCrop.jpg", cvCopy);
-        
-        
         //Process cropped wave
         //cv::cvtColor(cvCopy,cvCopy,cv::COLOR_BGR2GRAY); // Convert to grayscale
         GaussianBlur(cvCopy, cvCopy, cv::Size(5,3), 5,0);
         
         cv::Canny(cvCopy,cvCopy,50,150);
-        kernel = getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(15,15)); //Only use odd numbers
+        kernel = getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(15,15));
         cv::dilate(cvCopy, cvCopy, kernel);
-        kernel = getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3)); //Only use odd numbers
+        kernel = getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
         cv::erode(cvCopy, cvCopy, kernel);
         
-        cv::imwrite("/Users/chasedurand/Desktop/3imgWaveProc.jpg", cvCopy);
-        
-        
         //extract wave
-        
         int channels = cvCopy.channels();
         int nRows = cvCopy.rows;
         int nCols = cvCopy.cols * channels;
@@ -501,20 +409,12 @@ public:
             }
         }
         
-        
         //Scan pixels
-        
-        
         int waveTop;
         int waveBottom;
-        //cv::Mat blank = cv::Mat::zeros(cv::Size(cvCopy.cols,cvCopy.rows),CV_8UC1);
         cv::Mat outputWave = cv::Mat::zeros(cv::Size(cvCopy.cols,cvCopy.rows),CV_8UC1);
-        //blank.copyTo(destination);
-        
-        //std::vector<int> wave(nCols);
         wave.clear();
         int rawWave;
-        double denom;
         
         for(int i = 0; i < nCols; i++){
             //for every x pixel, search from top down until line,
@@ -538,55 +438,31 @@ public:
                 //We know we're gaurenteed to find at least one high value (the same one we found while searching from top)
                 waveBottom = j;
                 
-                //Find midpoint and save
-                //wave[i] = waveTop + (waveBottom - waveTop)/2;
-                
                 //Find midpoint between found top and bottom waves, shift around 0 and scale by half of height to convert to floating point -1 to 1
                 rawWave = waveTop + (waveBottom - waveTop)/2;
                 
-                //std::cout << "int raw: " << rawWave << std::endl;
-                //std::cout << "float: " << denom << std::endl;
-                //denom = ((double)nRows * (2.0 * (double)((double)rawWave - ((double)nRows / 2.0))));
-                
-                //static_cast<double>(rawWave);
-                
                 //shift
                 double result = static_cast<double>(rawWave) - (0.5 * static_cast<double>(nRows));
-                
                 //scale
                 result = result / (0.5 * static_cast<double>(nRows));
-                
                 //save
                 wave.push_back(result);
-                
-                
             }
-            //std::cout << "Wave at " << i << " is " << wave[i] << " from " << rawWave << std::endl; //Output found row per column for debugging
-            //std::cout << "Wave at " << i << " is " << wave[i] << std::endl; //Output found row per column for debugging
             outputWave.at<uchar>(rawWave,i) = 255; //377?
         }
         
-        
+        //Output wave coordinates for debugging
+        /*
         for(int i = 0; i < wave.size(); i++){
             std::cout << "Wave at " << i << " is " << wave[i] << std::endl;
         }
-        
-        
-        
-        
+         */
         
         for(int i = 0; i < wave.size(); i++){
             waveTable.set(i, wave[i]);
         }
-        
-        
-        
-        
+
         std::cout << "Wave extraction complete." << std::endl;
-        cv::imwrite("/Users/chasedurand/Desktop/4imgOutputWave.jpg", outputWave);
-        std::cout << "pause here" <<std::endl;
-        
-        
         
 #if JUCE_CONTENT_SHARING
         auto imageFile = File::getSpecialLocation (File::tempDirectory).getNonexistentChildFile ("JuceCameraPhotoDemo", ".jpg");
@@ -614,18 +490,7 @@ public:
 #endif
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     void errorOccurred (const juce::String& error)
     {
         juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::InfoIcon,
@@ -652,17 +517,7 @@ public:
     
     void timerCallback() override
     {
-        /*
-        img = cv::imread(path);
-        if(img.data){
-            cv::imshow("Video",img);
-            cv::waitKey(10);
-            std::cout << "video!" <<std::endl;
-        }
-        else{
-            std::cout << "timer!" << std::endl;
-        }
-         */
+        
     }
     
     //==============================================================================
@@ -675,13 +530,11 @@ public:
         wtSize = 1160;
         currentSampleRate = sampleRate;
         
-        
         //one cycle of a sine wave
         for (int i = 0; i < wtSize; i++)
         {
             waveTable.insert(i, sin(2.0 * juce::double_Pi * i / wtSize));
         }
-        
         
         visualiser.clear();
     }
@@ -741,8 +594,6 @@ public:
         snapshotButton.changeWidthToFitText (24);
         snapshotButton.setBounds (top.removeFromLeft (snapshotButton.getWidth()));
         top.removeFromLeft (4);
-        //recordMovieButton.changeWidthToFitText (24);
-        //recordMovieButton.setBounds (top.removeFromLeft (recordMovieButton.getWidth()));
         
         r.removeFromTop (4);
         auto previewArea = shouldUseLandscapeLayout() ? r.removeFromLeft (r.getWidth() / 2)
