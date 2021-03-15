@@ -458,8 +458,16 @@ public:
         }
          */
         
+        //Normalize scale of wave so peak hits -1 or +1
+        double waveMax = *max_element(wave.begin(),wave.end());
+        double waveMin = -1*(*min_element(wave.begin(),wave.end()));
+        if(waveMin>waveMax){
+            waveMax = waveMin;
+        }
+        double scaleFactor = 1.0 / waveMax;
+        
         for(int i = 0; i < wave.size(); i++){
-            waveTable.set(i, wave[i]);
+            waveTable.set(i, wave[i]*scaleFactor);
         }
 
         std::cout << "Wave extraction complete." << std::endl;
